@@ -258,29 +258,10 @@ def run_local(base,
               ref,
               ref_mask,
               *args):
-    
-    # # original_mask shape: {original_mask.shape}, reference_original_mask shape: {reference_original_mask.shape},
-    # print(f"input_image shape: {base.shape}, type: {type(base)}, input_image: {base}", flush=True)
-    # print(f"original_mask shape: {mask.shape}, type: {type(mask)}, unique_value: {np.unique(mask)}, original_mask: {mask}", flush=True)
-    # print(f"reference_image shape: {ref.shape}, type: {type(ref)}, reference_image: {ref}", flush=True)
-    # print(f"reference_original_mask shape: {ref_mask.shape} type: {type(ref_mask)}, unique_value: {np.unique(ref_mask)}, reference_original_mask: {ref_mask}", flush=True)
 
-#     # image = base.convert("RGB")
-#     image = cv2.cvtColor(base, cv2.COLOR_BGR2RGB)
-    
-#     # mask = mask.convert("L")
-#     mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-#     # ref_image = ref.convert("RGB")
-#     ref_image = cv2.cvtColor(ref, cv2.COLOR_BGR2RGB)
-    
-#     # ref_mask = ref_mask.convert("L")
-#     ref_mask = cv2.cvtColor(ref_mask, cv2.COLOR_BGR2GRAY)
-    
-    image = base # np.asarray(image)
-    # mask = np.asarray(mask)
+    image = base
     mask = np.where(mask.sum(-1) > 128, 0, 1).astype(np.uint8)
-    ref_image = ref # np.asarray(ref_image)
-    # ref_mask = np.asarray(ref_mask)
+    ref_image = ref 
     ref_mask = np.where(ref_mask.sum(-1) > 128, 0, 1).astype(np.uint8)
 
     if ref_mask.sum() == 0:
@@ -296,7 +277,6 @@ def run_local(base,
     synthesis = torch.from_numpy(synthesis).permute(2, 0, 1)
     synthesis = synthesis.permute(1, 2, 0).numpy()
     return [synthesis]
-
 
 
 with gr.Blocks() as demo:
@@ -331,7 +311,7 @@ with gr.Blocks() as demo:
             with gr.Column(elem_id="Background"):
                 with gr.Row():
                     with gr.Tabs(elem_classes=["feedback"]):
-                        with gr.TabItem("Input"):
+                        with gr.TabItem("Background"):
                             input_image = gr.Image(type="numpy", label="input", scale=2, height=640)
                 original_image = gr.State(value=None,label="index")
                 original_mask = gr.State(value=None)
@@ -353,12 +333,15 @@ with gr.Blocks() as demo:
                     reference_undo_button = gr.Button('Undo seg', elem_id="btnSEG",scale=1)
             
         run_local_button = gr.Button(label="Generate", value="Run")
+        
+        def update_original_image(example_image):
+            return example_image
 
         with gr.Row():
             with gr.Column():
-                gr.Examples(image_list, inputs=[input_image],label="Examples - Background Image",examples_per_page=16)
+                gr.Examples(image_list, inputs=[input_image], outputs=[original_image], fn=update_original_image, run_on_click=True, label="Examples - Background Image",examples_per_page=16)
             with gr.Column():
-                gr.Examples(ref_list, inputs=[reference_image],label="Examples - Reference Object",examples_per_page=16)
+                gr.Examples(ref_list, inputs=[reference_image], outputs=[reference_original_image], fn=update_original_image, run_on_click=True, label="Examples - Reference Object",examples_per_page=16)
     
     # once user upload an image, the original image is stored in `original_image`
     def store_img(img):
@@ -383,7 +366,6 @@ with gr.Blocks() as demo:
 
     # user click the image to get points, and show the points on the image
     def segmentation(img, sel_pix):
-        print(f"img shape: {img.shape}, sel_pix: {sel_pix}", flush=True)
         # online show seg mask
         points = []
         labels = []
@@ -418,10 +400,11 @@ with gr.Blocks() as demo:
         else:
             sel_pix.append((evt.index, 1))    # default foreground_point
 
-        if isinstance(img, int):
-            image_name = image_examples[img][0]
-            img = cv2.imread(image_name)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # if isinstance(img, int):
+        #     image_name = image_list[img][0]
+        #     img = cv2.imread(image_name)
+        #     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #     print(f"img type: {type(img)}, img: {img}", flush=True)
 
         # online show seg mask
         masked_img, output_mask = segmentation(img, sel_pix)
@@ -441,15 +424,15 @@ with gr.Blocks() as demo:
     )
 
     # undo the selected point
-    def undo_points(orig_img, sel_pix):
+    def undo_points(orig_img, sel_pix, image_list):
         # draw points
         output_mask = None
         if len(sel_pix) != 0:
-            if isinstance(orig_img, int):   # if orig_img is int, the image if select from examples
-                temp = cv2.imread(image_examples[orig_img][0])
-                temp = cv2.cvtColor(temp, cv2.COLOR_BGR2RGB)
-            else:
-                temp = orig_img.copy()
+            # if isinstance(orig_img, int):   # if orig_img is int, the image if select from examples
+            #     temp = cv2.imread(image_list[orig_img][0])
+            #     temp = cv2.cvtColor(temp, cv2.COLOR_BGR2RGB)
+            # else:
+            temp = orig_img.copy()
             sel_pix.pop()
             # online show seg mask
             if len(sel_pix) !=0:
