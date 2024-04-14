@@ -262,7 +262,6 @@ def run_local(base,
     return [synthesis]
 
 
-
 with gr.Blocks() as demo:
     with gr.Column():
         gr.Markdown("#  Play with AnyDoor to Teleport your Target Objects! ")
@@ -289,9 +288,9 @@ with gr.Blocks() as demo:
         gr.Markdown("### You could draw coarse masks on the background to indicate the desired location and shape.")
         gr.Markdown("### <u>Do not forget</u> to annotate the target object on the reference image.")
         with gr.Row():
-            base = gr.Image(label="Background", source="upload", tool="sketch", type="pil", height=512, brush_color='#FFFFFF', mask_opacity=0.5)
-            ref = gr.Image(label="Reference", source="upload", tool="sketch", type="pil", height=512, brush_color='#FFFFFF', mask_opacity=0.5)
-        run_local_button = gr.Button(label="Generate", value="Run")
+            base = gr.Image(label="Background", type="pil", height=512, ) # source="upload", tool="sketch", brush_color='#FFFFFF', mask_opacity=0.5
+            ref = gr.Image(label="Reference", type="pil", height=512, ) # source="upload", tool="sketch", brush_color='#FFFFFF', mask_opacity=0.5
+        run_local_button = gr.Button( value="Run") # label="Generate",
 
         with gr.Row():
             with gr.Column():

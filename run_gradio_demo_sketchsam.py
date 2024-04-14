@@ -316,6 +316,7 @@ with gr.Blocks() as demo:
                     with gr.Tabs(elem_classes=["feedback"]):
                         with gr.TabItem("Background"):
                             input_image = gr.Image(label="Background", source="upload", tool="sketch", type="pil", height=640, brush_color='#FFFFFF', mask_opacity=0.5)
+                            
 #                 original_image = gr.State(value=None,label="index")
 #                 original_mask = gr.State(value=None)
 #                 selected_points = gr.State([],label="select points")

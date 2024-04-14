@@ -277,16 +277,9 @@ def run_local(base,
               ref_mask,
               *args):
     
-    print(f"type: {type(base)}, base: {base}")
-    image = base["image"] # .convert("RGB")
+    image = base["image"]
     box = base['boxes'][0]
-    
     mask = create_mask(image, [box['xmin'], box['ymin'], box['xmax'], box['ymax']])
-    # mask = base["mask"].convert("L")
-    
-    # image = np.asarray(image)
-    # mask = np.asarray(mask)
-    # mask = np.where(mask > 128, 1, 0).astype(np.uint8)
     
     ref_image = ref 
     ref_mask = np.where(ref_mask.sum(-1) > 128, 0, 1).astype(np.uint8)
@@ -310,7 +303,7 @@ with gr.Blocks() as demo:
     with gr.Column():
         gr.Markdown("#  Play with AnyDoor to Teleport your Target Objects! ")
         with gr.Row():
-            baseline_gallery = gr.Gallery(label='Output', show_label=True, elem_id="gallery", columns=1, height=768)
+            baseline_gallery = gr.Gallery(label='Output', show_label=True, elem_id="gallery", columns=1, height=640)
             with gr.Accordion("Advanced Option", open=True):
                 num_samples = 1
                 strength = gr.Slider(label="Control Strength", minimum=0.0, maximum=2.0, value=1.0, step=0.01)
@@ -327,45 +320,34 @@ with gr.Blocks() as demo:
                 gr.Markdown(" Enable shape control means the generation results would consider user-drawn masks to control the shape & pose; otherwise it \
                               considers the location and size to adjust automatically.")
 
-    
         gr.Markdown("# Upload / Select Images for the Background (left) and Reference Object (right)")
         gr.Markdown("### You could draw coarse masks on the background to indicate the desired location and shape.")
         gr.Markdown("### <u>Do not forget</u> to annotate the target object on the reference image.")
-        with gr.Row():
-            # base = gr.Image(label="Background", source="upload", tool="sketch", type="pil", height=512, brush_color='#FFFFFF', mask_opacity=0.5)
-            # ref = gr.Image(label="Reference", source="upload", tool="sketch", type="pil", height=512, brush_color='#FFFFFF', mask_opacity=0.5)
+        with gr.Row():  
             
             with gr.Column(elem_id="Background"):
                 with gr.Row():
                     with gr.Tabs(elem_classes=["feedback"]):
-                        with gr.TabItem("Background"):
-                            # input_image = gr.Image(label="Background", source="upload", tool="sketch", type="pil", height=640, brush_color='#FFFFFF', mask_opacity=0.5)
-                            
+                        with gr.TabItem("Background"):         
                             input_image = image_annotator(
-                                {"image": "https://gradio-builds.s3.amazonaws.com/demo-files/base.png"},
-                                label_list=["Person", "Vehicle"],
-                                label_colors=[(0, 255, 0), (255, 0, 0)],
+                                label="background",
+                                label_list=["Object"],
+                                label_colors=[(0, 255, 0)],
+                                boxes_alpha=0.5,
+                                height=640
                             )
                             
-                            print(f"input_image: {type(input_image)}, {input_image}")
-                            button_get = gr.Button("Get bounding boxes")
-                            json_boxes = gr.JSON()
-                            button_get.click(get_boxes_json, input_image, json_boxes)
+                            dummy_input_image =  gr.Image(label="dummy", visible=False, height=640)
                             
-                            print(f"after uploading, input_image: {type(input_image)}, {input_image}")
-                            
-#                 original_image = gr.State(value=None,label="index")
-#                 original_mask = gr.State(value=None)
-#                 selected_points = gr.State([],label="select points")
-#                 with gr.Row(elem_id="Seg"):
-#                     radio = gr.Radio(['foreground', 'background'], label='Click to seg: ', value='foreground',scale=2)
-#                     undo_button = gr.Button('Undo seg', elem_id="btnSEG",scale=1)
-            
+                            # button_get = gr.Button("Get bounding boxes")
+                            # json_boxes = gr.JSON()
+                            # button_get.click(get_boxes_json, input_image, json_boxes)
+
             with gr.Column(elem_id="Reference"):
                 with gr.Row():
                     with gr.Tabs(elem_classes=["feedback"]):
                         with gr.TabItem("Reference"):
-                            reference_image = gr.Image(type="numpy", label="reference",scale=2, height=640)
+                            reference_image = gr.Image(type="numpy", label="reference", scale=2, height=640)
                 reference_original_image = gr.State(value=None) # label="reference_index"
                 reference_original_mask = gr.State(value=None)
                 reference_selected_points = gr.State([]) # label="reference_select points"
@@ -377,27 +359,46 @@ with gr.Blocks() as demo:
         
         def update_original_image(example_image):
             return example_image
-
+        
+        def update_input_image(example_image):
+            return {"image": example_image}
+        
         with gr.Row():
             with gr.Column():
-                gr.Examples(image_dict_list, inputs=[input_image], label="Examples - Background Image",examples_per_page=16)
+                gr.Examples(image_list, inputs=[dummy_input_image], outputs=[input_image], fn=update_input_image, run_on_click=True, label="Examples - Background Image", examples_per_page=10)
             with gr.Column():
-                gr.Examples(ref_list, inputs=[reference_image], outputs=[reference_original_image], fn=update_original_image, run_on_click=True, label="Examples - Reference Object",examples_per_page=16)
+                gr.Examples(ref_list, inputs=[reference_image], outputs=[reference_original_image], fn=update_original_image, run_on_click=True, label="Examples - Reference Object", examples_per_page=10)
     
     # once user upload an image, the original image is stored in `original_image`
-    def store_img(img):
+    
+    def store_img_input(img):
+        img = img['image']
         # image upload is too slow
         if min(img.shape[0], img.shape[1]) > 512:
             img = resize_image(img, 512)
         if max(img.shape[0], img.shape[1])*1.0/min(img.shape[0], img.shape[1])>2.0:
             raise gr.Error('image aspect ratio cannot be larger than 2.0')
-        return img, img, [], None  # when new image is uploaded, `selected_points` should be empty
-
+        return {"image": img}  # when new image is uploaded, `selected_points` should be empty
+    
     # input_image.upload(
-    #     store_img,
+    #     store_img_input,
     #     [input_image],
-    #     [input_image, original_image, selected_points]
+    #     [input_image]
     # )
+    
+#     input_image.change(
+#         store_img_input,
+#         [input_image],
+#         [input_image]
+#     )
+    
+    def store_img(img):
+        # image upload is too slow
+        # if min(img.shape[0], img.shape[1]) > 512:
+        #     img = resize_image(img, 512)
+        if max(img.shape[0], img.shape[1])*1.0/min(img.shape[0], img.shape[1])>2.0:
+            raise gr.Error('image aspect ratio cannot be larger than 2.0')
+        return img, img, [], None  # when new image is uploaded, `selected_points` should be empty
     
     reference_image.upload(
         store_img,
@@ -429,7 +430,6 @@ with gr.Blocks() as demo:
         masked_img = masked_img*255
         ## draw points
         for point, label in sel_pix:
-            # print(f"masked_img: {masked_img}, point: {point}, label: {label}", flush=True)
             cv2.drawMarker(masked_img, tuple(point), tuple(colors[label]), markerType=markers[label], markerSize=20, thickness=5)
         return masked_img, output_mask
     
@@ -441,22 +441,10 @@ with gr.Blocks() as demo:
         else:
             sel_pix.append((evt.index, 1))    # default foreground_point
 
-        # if isinstance(img, int):
-        #     image_name = image_list[img][0]
-        #     img = cv2.imread(image_name)
-        #     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        #     print(f"img type: {type(img)}, img: {img}", flush=True)
-
         # online show seg mask
         masked_img, output_mask = segmentation(img, sel_pix)
         
         return masked_img.astype(np.uint8), output_mask
-    
-    # input_image.select(
-    #     get_point,
-    #     [original_image, selected_points, radio],
-    #     [input_image, original_mask],
-    # )
     
     reference_image.select(
         get_point,
@@ -469,10 +457,6 @@ with gr.Blocks() as demo:
         # draw points
         output_mask = None
         if len(sel_pix) != 0:
-            # if isinstance(orig_img, int):   # if orig_img is int, the image if select from examples
-            #     temp = cv2.imread(image_list[orig_img][0])
-            #     temp = cv2.cvtColor(temp, cv2.COLOR_BGR2RGB)
-            # else:
             temp = orig_img.copy()
             sel_pix.pop()
             # online show seg mask
@@ -481,12 +465,6 @@ with gr.Blocks() as demo:
             return temp.astype(np.uint8), output_mask
         else:
             gr.Error("Nothing to Undo")
-    
-    # undo_button.click(
-    #     undo_points,
-    #     [original_image, selected_points],
-    #     [input_image, original_mask]
-    # )
     
     reference_undo_button.click(
         undo_points,
